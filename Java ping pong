@@ -1,0 +1,130 @@
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.Timer;
+
+public class PingPongGame extends JPanel implements ActionListener {
+
+    private static final int WIDTH = 800;
+    private static final int HEIGHT = 600;
+    private static final int PADDLE_WIDTH = 15;
+    private static final int PADDLE_HEIGHT = 100;
+    private static final int BALL_SIZE = 15;
+
+    private int ballX = WIDTH / 2 - BALL_SIZE / 2;
+    private int ballY = HEIGHT / 2 - BALL_SIZE / 2;
+    private int ballVelocityX = 2;
+    private int ballVelocityY = 2;
+
+    private int player1Y = HEIGHT / 2 - PADDLE_HEIGHT / 2;
+    private int player2Y = HEIGHT / 2 - PADDLE_HEIGHT / 2;
+    private int player1VelocityY = 0;
+    private int player2VelocityY = 0;
+
+    private Timer timer;
+
+    public PingPongGame() {
+        setPreferredSize(new Dimension(WIDTH, HEIGHT));
+        setBackground(Color.BLACK);
+        setFocusable(true);
+        addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_W) {
+                    player1VelocityY = -2;
+                }
+                if (e.getKeyCode() == KeyEvent.VK_S) {
+                    player1VelocityY = 2;
+                }
+                if (e.getKeyCode() == KeyEvent.VK_UP) {
+                    player2VelocityY = -2;
+                }
+                if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+                    player2VelocityY = 2;
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_W || e.getKeyCode() == KeyEvent.VK_S) {
+                    player1VelocityY = 0;
+                }
+                if (e.getKeyCode() == KeyEvent.VK_UP || e.getKeyCode() == KeyEvent.VK_DOWN) {
+                    player2VelocityY = 0;
+                }
+            }
+        });
+
+        timer = new Timer(1000 / 60, this); // 60 FPS
+        timer.start();
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        // Move the ball
+        ballX += ballVelocityX;
+        ballY += ballVelocityY;
+
+        // Move the paddles
+        player1Y += player1VelocityY;
+        player2Y += player2VelocityY;
+
+        // Prevent paddles from going out of bounds
+        if (player1Y < 0) player1Y = 0;
+        if (player1Y > HEIGHT - PADDLE_HEIGHT) player1Y = HEIGHT - PADDLE_HEIGHT;
+        if (player2Y < 0) player2Y = 0;
+        if (player2Y > HEIGHT - PADDLE_HEIGHT) player2Y = HEIGHT - PADDLE_HEIGHT;
+
+        // Ball collision with top and bottom walls
+        if (ballY <= 0 || ballY >= HEIGHT - BALL_SIZE) {
+            ballVelocityY = -ballVelocityY;
+        }
+
+        // Ball collision with paddles
+        if (ballX <= PADDLE_WIDTH && ballY + BALL_SIZE > player1Y && ballY < player1Y + PADDLE_HEIGHT) {
+            ballVelocityX = -ballVelocityX;
+        }
+        if (ballX >= WIDTH - PADDLE_WIDTH - BALL_SIZE && ballY + BALL_SIZE > player2Y && ballY < player2Y + PADDLE_HEIGHT) {
+            ballVelocityX = -ballVelocityX;
+        }
+
+        // Ball out of bounds (left or right)
+        if (ballX < 0 || ballX > WIDTH) {
+            ballX = WIDTH / 2 - BALL_SIZE / 2;
+            ballY = HEIGHT / 2 - BALL_SIZE / 2;
+            ballVelocityX = -ballVelocityX; // Start the ball going in the opposite direction
+        }
+
+        repaint();
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        // Draw paddles
+        g.setColor(Color.WHITE);
+        g.fillRect(30, player1Y, PADDLE_WIDTH, PADDLE_HEIGHT);
+        g.fillRect(WIDTH - 30 - PADDLE_WIDTH, player2Y, PADDLE_WIDTH, PADDLE_HEIGHT);
+
+        // Draw ball
+        g.fillRect(ballX, ballY, BALL_SIZE, BALL_SIZE);
+    }
+
+    public static void main(String[] args) {
+        JFrame frame = new JFrame("Ping Pong Game");
+        PingPongGame game = new PingPongGame();
+        frame.add(game);
+        frame.pack();
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+}
