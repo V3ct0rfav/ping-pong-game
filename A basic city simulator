@@ -1,1 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            background-color: #111827; /* Dark background */
+            color: #f9fafb; /* Light text */
+            overflow-x: hidden;  /* Prevent horizontal scrollbar */
+        }
+        #gameCanvas {
+            background-color: #4a5568; /* Dark grey canvas */
+            border: 2px solid #718096; /* Darker border */
+            cursor: pointer;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); /* Add shadow for depth */
+        }
+        #controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+            width: 90%;
+            max-width: 600px; /* Limit width of controls */
+        }
+        .button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #6b7280; /* Dark grey button */
+            color: #f9fafb; /* Light text */
+            border: none;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            font-family: 'Press Start 2P', sans-serif;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Add shadow */
+            width: 100%; /* Make buttons take up full width */
+            text-align: center; /* Center the text */
+        }
+        .button:hover {
+            background-color: #9ca3af; /* Lighten on hover */
+            transform: scale(1.05);
+        }
+        .button.active {
+            background-color: #a7f3d0; /* Green for active tool */
+            color: #134e4a;
+            transform: scale(1.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5); /* Increase shadow */
+        }
+        #info {
+            background-color: #2d3748; /* Dark info background */
+            color: #f56565; /* Reddish text for resources */
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            text-align: center;
+            border: 2px solid #e53e3e; /* Darker red border */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 600px; /* Limit width of info */
+        }
+        #message-box {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #ffffff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            pointer-events: none; /* Allows clicks to pass through */
+        }
+        .show-message {
+            opacity: 1;
+        }
+        @media (min-width: 640px) {
+          #controls {
+                flex-direction: row;
+                justify-content: center;
+            }
+            .button {
+                width: auto; /* Buttons adjust to content width on larger screens */
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <div id="controls">
+        <button class="button" id="buildRoad">Build Road</button>
+        <button class="button" id="buildHouse">Build House</button>
+        <button class="button" id="buildFactory">Build Factory</button>
+        <button class="button" id="destroy">Destroy</button>
+        <button class="button" id="infoButton">Info</button> </div>
+    <div id="info">
+        Resources: <span id="money">1000</span> | Population: <span id="population">0</span> | Pollution: <span id="pollution">0</span>
+    </div>
+    <div id="message-box"></div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const buildRoadButton = document.getElementById('buildRoad');
+        const buildHouseButton = document.getElementById('buildHouse');
+        const buildFactoryButton = document.getElementById('buildFactory');
+        const destroyButton = document.getElementById('destroy');
+        const moneyDisplay = document.getElementById('money');
+        const populationDisplay = document.getElementById('population');
+        const pollutionDisplay = document.getElementById('pollution');
+        const infoButton = document.getElementById('infoButton'); // Get the info button
+        const messageBox = document.getElementById('message-box');
+
+        const gridSize = 20;
+        const numRows = canvas.height / gridSize;
+        const numCols = canvas.width / gridSize;
+
+        let grid = [];
+        for (let i = 0; i < numRows; i++) {
+            grid[i] = [];
+            for (let j = 0; j < numCols; j++) {
+                grid[i][j] = 0; // 0: empty, 1: road, 2: house, 3: factory
+            }
+        }
+
+        let selectedTool = 'road';
+        let money = 1000;
+        let population = 0;
+        let pollution = 0;
+        let isInfoVisible = false; // Track info visibility
+
+        const cost = {
+            road: 10,
+            house: 100,
+            factory: 200,
+            destroy: 5
+        };
+
+        const buildingColors = {
+            0: '#4a5568', // Empty - dark grey
+            1: '#f59e0b', // Road - amber
+            2: '#a7f3d0', // House - teal
+            3: '#fca5a5' // Factory - red
+        };
+
+        function drawGrid() {
+            ctx.strokeStyle = '#718096'; // Darker grid lines
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= numRows; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i * gridSize);
+                ctx.lineTo(canvas.width, i * gridSize);
+                ctx.stroke();
+            }
+            for (let j = 0; j <= numCols; j++) {
+                ctx.beginPath();
+                ctx.moveTo(j * gridSize, 0);
+                ctx.lineTo(j * gridSize, canvas.height);
+                ctx.stroke();
+            }
+        }
+
+        function drawCell(row, col) {
+            ctx.fillStyle = buildingColors[grid[row][col]] || '#4a5568';
+            ctx.fillRect(col * gridSize, row * gridSize, gridSize, gridSize);
+            if (grid[row][col] === 2) { // House - Roof
+                ctx.fillStyle = '#6ee7b7'; // A lighter shade for the roof
+                ctx.beginPath();
+                ctx.moveTo(col * gridSize + gridSize/2, row * gridSize);
+                ctx.lineTo(col * gridSize, row * gridSize + gridSize/3);
+                ctx.lineTo(col * gridSize + gridSize, row * gridSize + gridSize/3);
+                ctx.closePath();
+                ctx.fill();
+            }
+             if (grid[row][col] === 3) { // Factory - Chimney
+                ctx.fillStyle = '#ef4444'; // A darker shade for the chimney
+                ctx.fillRect(col * gridSize + gridSize/4, row * gridSize, gridSize/2, gridSize/3);
+            }
+        }
+
+        function showMessage(message) {
+            messageBox.textContent = message;
+            messageBox.classList.add('show-message');
+            setTimeout(() => {
+                messageBox.classList.remove('show-message');
+            }, 3000); // Message disappears after 3 seconds
+        }
+
+        function handleCanvasClick(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const col = Math.floor(x / gridSize);
+            const row = Math.floor(y / gridSize);
+
+            if (row < 0 || row >= numRows || col < 0 || col >= numCols) {
+                return; // Out of bounds
+            }
+
+            if (selectedTool === 'road') {
+                if (grid[row][col] === 0 && money >= cost.road) {
+                    grid[row][col] = 1;
+                    money -= cost.road;
+                    moneyDisplay.textContent = money;
+                    drawCell(row, col);
+                    showMessage('Road Built!');
+                } else if (grid[row][col] !== 0) {
+                    showMessage('Cannot build road here!');
+                } else {
+                    showMessage('Not enough money!');
+                }
+            } else if (selectedTool === 'house') {
+                if (grid[row][col] === 0 && money >= cost.house) {
+                    grid[row][col] = 2;
+                    money -= cost.house;
+                    moneyDisplay.textContent = money;
+                    population++;
+                    populationDisplay.textContent = population;
+                    drawCell(row, col);
+                    showMessage('House Built!');
+                } else if (grid[row][col] !== 0) {
+                     showMessage('Cannot build house here!');
+                }else {
+                    showMessage('Not enough money!');
+                }
+            } else if (selectedTool === 'factory') {
+                if (grid[row][col] === 0 && money >= cost.factory) {
+                    grid[row][col] = 3;
+                    money -= cost.factory;
+                    moneyDisplay.textContent = money;
+                    pollution += 10;
+                    pollutionDisplay.textContent = pollution;
+                    drawCell(row, col);
+                    showMessage('Factory Built!');
+                } else if (grid[row][col] !== 0) {
+                    showMessage('Cannot build factory here!');
+                }else {
+                    showMessage('Not enough money!');
+                }
+            } else if (selectedTool === 'destroy') {
+                if (grid[row][col] !== 0) {
+                    money += cost.destroy;
+                    moneyDisplay.textContent = money;
+                    if(grid[row][col] === 2){
+                        population--;
+                        populationDisplay.textContent = population;
+                    }
+                    if(grid[row][col] === 3){
+                        pollution -= 10;
+                        pollutionDisplay.textContent = pollution;
+                    }
+                    grid[row][col] = 0;
+                    drawCell(row, col);
+                    showMessage('Building Destroyed!');
+                } else {
+                    showMessage('Nothing to destroy here!');
+                }
+            }
+        }
+
+        function handleToolSelect(tool) {
+            selectedTool = tool;
+            // Reset all button styles
+            buildRoadButton.classList.remove('active');
+            buildHouseButton.classList.remove('active');
+            buildFactoryButton.classList.remove('active');
+            destroyButton.classList.remove('active');
+             infoButton.classList.remove('active');
+
+            // Set active style for selected tool
+            if (tool === 'road') {
+                buildRoadButton.classList.add('active');
+            } else if (tool === 'house') {
+                buildHouseButton.classList.add('active');
+            } else if (tool === 'factory') {
+                buildFactoryButton.classList.add('active');
+            } else if (tool === 'destroy') {
+                destroyButton.classList.add('active');
+            } else if (tool === 'info') {
+                infoButton.classList.add('active');
+            }
+        }
+
+        function toggleInfoVisibility() {
+            isInfoVisible = !isInfoVisible;
+            if (isInfoVisible) {
+                infoButton.classList.add('active'); // Keep button highlighted when info is "active"
+                document.getElementById('info').style.display = 'block';
+            } else {
+                infoButton.classList.remove('active');
+                document.getElementById('info').style.display = 'none';
+            }
+        }
+
+        // Event Listeners
+        buildRoadButton.addEventListener('click', () => handleToolSelect('road'));
+        buildHouseButton.addEventListener('click', () => handleToolSelect('house'));
+        buildFactoryButton.addEventListener('click', () => handleToolSelect('factory'));
+        destroyButton.addEventListener('click', () => handleToolSelect('destroy'));
+        infoButton.addEventListener('click', toggleInfoVisibility); // Add listener for info button
+        canvas.addEventListener('click', handleCanvasClick);
+
+        // Initial draw
+        drawGrid();
+        handleToolSelect('road'); // Default tool
+
+        // Hide info box initially
+        document.getElementById('info').style.display = 'none';
+    </script>
+</body>
+</html>
 
