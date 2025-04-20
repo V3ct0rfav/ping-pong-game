@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planetary Gravity Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100vh;
+            background-color: #0c111b; /* Deep space background */
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        #simulationCanvas {
+            background-color: #000000;
+            border: 2px solid #3b82f6; /* Tailwind's blue-500 */
+            cursor: grab;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8); /* Stronger shadow */
+            transition: cursor 0.2s ease;
+        }
+        #simulationCanvas:active {
+            cursor: grabbing;
+        }
+        #controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+            color: #ffffff;
+        }
+        .button {
+            padding: 12px 24px;
+            margin: 8px;
+            cursor: pointer;
+            background-color: #3b82f6; /* Tailwind's blue-500 */
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5); /* Add shadow */
+            font-family: 'Press Start 2P', sans-serif;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+        .button:hover {
+            background-color: #6366f1; /* Tailwind's blue-600 */
+            transform: scale(1.05);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.6); /* Increase shadow on hover */
+        }
+        .button:active {
+            background-color: #2563eb; /* Tailwind's blue-700 */
+            transform: scale(0.95);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Reduce shadow on active */
+        }
+        #planetProperties {
+            background-color: #1f2937; /* Darker background for properties */
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            color: #ffffff;
+            display: none; /* Initially hidden */
+            flex-direction: column;
+            align-items: flex-start;
+            border: 2px solid #4b5563; /* Darker border */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+            width: 90%;
+            max-width: 400px; /* Limit width */
+        }
+        #planetProperties label {
+            margin-top: 10px;
+            font-size: 0.7rem;
+            color: #cbd5e0; /* Lighter text */
+            display: block; /* Ensure label takes full width */
+            margin-bottom: 5px;
+        }
+        #planetProperties input {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #6b7280; /* Darker input border */
+            background-color: #374151; /* Darker input background */
+            color: #ffffff;
+            font-size: 0.8rem;
+            width: 100%; /* Make input take full width */
+            box-sizing: border-box; /* Include padding and border in width */
+            margin-bottom: 15px;
+        }
+        #planetProperties input:focus {
+            outline: none;
+            border-color: #3b82f6; /* Tailwind's blue-500 on focus */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        #message-box {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #ffffff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            pointer-events: none; /* Allows clicks to pass through */
+            font-family: 'Press Start 2P', sans-serif;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        .show-message {
+            opacity: 1;
+        }
+
+         /* Style for the slider track */
+        input[type="range"] {
+            -webkit-appearance: none;  /* Override default appearance */
+            width: 100%;               /* Full width */
+            height: 6px;
+            border-radius: 5px;
+            background: #4b5563; /* Darker slider track */
+            outline: none;         /* Remove outline */
+            -webkit-transition: .2s;  /* CSS3 Transition */
+            transition: opacity .2s;
+        }
+
+        /* Style for the slider thumb */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6; /* Tailwind's blue-500 */
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); /* Add shadow to thumb */
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6; /* Tailwind's blue-500 */
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); /* Add shadow to thumb */
+            border: none; /* Remove default border in Firefox */
+        }
+
+        /* Hover effects for the thumb */
+        input[type="range"]::-webkit-slider-thumb:hover,
+        input[type="range"]::-moz-range-thumb:hover {
+            background: #6366f1; /* Tailwind's blue-600 */
+            transform: scale(1.1); /* Enlarge on hover */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Increase shadow on hover*/
+        }
+
+        /* Active effects for the thumb */
+        input[type="range"]::-webkit-slider-thumb:active,
+        input[type="range"]::-moz-range-thumb:active {
+            background: #2563eb; /* Tailwind's blue-700 */
+            transform: scale(0.9);
+            box-shadow: 0 0px 1px rgba(0, 0, 0, 0.3); /* Reduce shadow on active */
+        }
+
+        /* Style for the slider track fill (the part that shows progress) */
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: #4b5563;  /* Darker track */
+            border-radius: 5px;
+        }
+
+        input[type="range"]::-moz-range-track {
+            background: #4b5563;  /* Darker track */
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="simulationCanvas" width="800" height="600"></canvas>
+    <div id="controls">
+        <button class="button" id="addPlanet">Add Planet</button>
+        <button class="button" id="resetSimulation">Reset</button>
+        <button class="button" id="toggleTrails">Toggle Trails</button>
+    </div>
+
+    <div id="planetProperties">
+        <h2 style="font-size: 1rem; margin-bottom: 15px; color: #ffffff;">Planet Properties</h2>
+        <label for="planetName">Name:</label>
+        <input type="text" id="planetName" value="Planet 1">
+        <label for="planetMass">Mass (kg):</label>
+        <input type="number" id="planetMass" value="1e20" min="1e10" step="1e10">
+        <label for="planetRadius">Radius (m):</label>
+        <input type="number" id="planetRadius" value="1000" min="100" step="100">
+        <label for="planetX">X Position (m):</label>
+        <input type="number" id="planetX" value="200" min="0" max="800">
+        <label for="planetY">Y Position (m):</label>
+        <input type="number" id="planetY" value="300" min="0" max="600">
+         <label for="planetVelocityX">Velocity X (m/s):</label>
+        <input type="number" id="planetVelocityX" value="0" step="10">
+        <label for="planetVelocityY">Velocity Y (m/s):</label>
+        <input type="number" id="planetVelocityY" value="0" step="10">
+        <label for="planetColor">Color:</label>
+        <input type="text" id="planetColor" value="#3b82f6">
+    </div>
+
+    <div id="message-box"></div>
+
+    <script>
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
+        const addPlanetButton = document.getElementById('addPlanet');
+        const resetButton = document.getElementById('resetSimulation');
+        const toggleTrailsButton = document.getElementById('toggleTrails');
+        const planetPropertiesDiv = document.getElementById('planetProperties');
+        const messageBox = document.getElementById('message-box');
+
+        let planets = [];
+        let isDragging = false;
+        let draggedPlanet = null;
+        let isPaused = false;
+        let animationFrameId;
+        let showTrails = true;
+        const G = 6.674e-11; // Gravitational constant
+
+        function showMessage(message) {
+            messageBox.textContent = message;
+            messageBox.classList.add('show-message');
+            setTimeout(() => {
+                messageBox.classList.remove('show-message');
+            }, 3000);
+        }
+
+        function addPlanet() {
+            const name = document.getElementById('planetName').value;
+            const mass = parseFloat(document.getElementById('planetMass').value);
+            const radius = parseFloat(document.getElementById('planetRadius').value);
+            const x = parseFloat(document.getElementById('planetX').value);
+            const y = parseFloat(document.getElementById('planetY').value);
+            const velocityX = parseFloat(document.getElementById('planetVelocityX').value);
+            const velocityY = parseFloat(document.getElementById('planetVelocityY').value);
+            const color = document.getElementById('planetColor').value;
+
+            if (mass <= 0 || radius <= 0) {
+                showMessage('Mass and radius must be positive values.');
+                return;
+            }
+
+            planets.push({
+                name,
+                mass,
+                radius,
+                x,
+                y,
+                velocityX,
+                velocityY,
+                color,
+                trail: [],
+            });
+            showMessage(`${name} added!`);
+            planetPropertiesDiv.style.display = 'none'; // Hide properties after adding
+            isPaused = false; // Start simulation after adding a planet.
+            if (!animationFrameId) {
+                animate(); // Make sure animation is running.
+            }
+        }
+
+        function resetSimulation() {
+            planets = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            isPaused = true;
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+            showMessage('Simulation reset!');
+        }
+
+        function toggleTrails() {
+            showTrails = !showTrails;
+            showMessage(`Trails ${showTrails ? 'enabled' : 'disabled'}!`);
+        }
+
+        function calculateForce(p1, p2) {
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < p1.radius + p2.radius) {
+                // Planets are colliding, handle collision (basic merge for now)
+                if (p1.mass > p2.mass) {
+                    p1.mass += p2.mass;
+                    p1.velocityX = (p1.velocityX * p1.mass + p2.velocityX * p2.mass) / (p1.mass + p2.mass);
+                    p1.velocityY = (p1.velocityY * p1.mass + p2.velocityY * p2.mass) / (p1.mass + p2.mass);
+                    planets.splice(planets.indexOf(p2), 1); // Remove p2
+                    showMessage(`${p2.name} collided with and was absorbed by ${p1.name}!`);
+                }
+                else {
+                    p2.mass += p1.mass;
+                    p2.velocityX = (p1.velocityX * p1.mass + p2.velocityX * p2.mass) / (p1.mass + p2.mass);
+                    p2.velocityY = (p1.velocityY * p1.mass + p2.velocityY * p2.mass) / (p1.mass + p2.mass);
+                    planets.splice(planets.indexOf(p1), 1); // Remove p1
+                    showMessage(`${p1.name} collided with and was absorbed by ${p2.name}!`);
+                }
+                return { x: 0, y: 0 }; // Return zero force
+            }
+
+            const force = G * p1.mass * p2.mass / (distance * distance);
+            const forceX = force * dx / distance;
+            const forceY = force * dy / distance;
+            return { x: forceX, y: forceY };
+        }
+
+        function updatePhysics() {
+            if (planets.length === 0 || isPaused) return;
+
+            const forces = [];
+            for (let i = 0; i < planets.length; i++) {
+                forces[i] = { x: 0, y: 0 };
+            }
+
+            // Calculate forces between each pair of planets
+            for (let i = 0; i < planets.length; i++) {
+                for (let j = i + 1; j < planets.length; j++) {
+                    const force = calculateForce(planets[i], planets[j]);
+                    forces[i].x += force.x;
+                    forces[i].y += force.y;
+                    forces[j].x -= force.x;
+                    forces[j].y -= force.y;
+                }
+            }
+
+            // Update velocities and positions
+            for (let i = 0; i < planets.length; i++) {
+                const planet = planets[i];
+                const accelerationX = forces[i].x / planet.mass;
+                const accelerationY = forces[i].y / planet.mass;
+
+                planet.velocityX += accelerationX;
+                planet.velocityY += accelerationY;
+                planet.x += planet.velocityX;
+                planet.y += planet.velocityY;
+
+                // Store trail points
+                if (showTrails) {
+                    planet.trail.push({ x: planet.x, y: planet.y, time: Date.now() });
+                }
+            }
+        }
+
+        function drawPlanets() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            planets.forEach(planet => {
+                // Draw trail
+                if (showTrails && planet.trail.length > 0) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = planet.color;
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(planet.trail[0].x, planet.trail[0].y);
+                    for (let j = 1; j < planet.trail.length; j++) {
+                         const point = planet.trail[j];
+                         const age = Date.now() - point.time;
+                         const alpha = Math.max(0, 1 - age / 2000); // Fade out over 2 seconds (2000ms)
+                         if (alpha <= 0) {
+                            planet.trail.splice(j, 1); // Remove old trail point
+                            j--; // Adjust index after removal
+                            continue;
+                         }
+                        ctx.globalAlpha = alpha;
+                        ctx.lineTo(point.x, point.y);
+                    }
+                    ctx.globalAlpha = 1; // Reset alpha
+                    ctx.stroke();
+                    ctx.closePath();
+                }
+
+                // Draw planet
+                ctx.beginPath();
+                ctx.arc(planet.x, planet.y, planet.radius, 0, Math.PI * 2);
+                ctx.fillStyle = planet.color;
+                ctx.shadowColor = planet.color;
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.closePath();
+
+                // Draw planet name
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '0.7rem "Press Start 2P"';
+                ctx.textAlign = 'center';
+                ctx.fillText(planet.name, planet.x, planet.y - planet.radius - 5);
+            });
+        }
+
+        function animate() {
+            if (!isPaused) {
+                updatePhysics();
+                drawPlanets();
+            }
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        function handleCanvasClick(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            // Check if clicking on a planet
+            for (let i = 0; i < planets.length; i++) {
+                const planet = planets[i];
+                const distance = Math.sqrt((x - planet.x) * (x - planet.x) + (y - planet.y) * (y - planet.y));
+                if (distance <= planet.radius) {
+                    isDragging = true;
+                    draggedPlanet = planet;
+                    planetPropertiesDiv.style.display = 'flex'; //show
+                    document.getElementById('planetName').value = planet.name;
+                    document.getElementById('planetMass').value = planet.mass;
+                    document.getElementById('planetRadius').value = planet.radius;
+                    document.getElementById('planetX').value = planet.x;
+                    document.getElementById('planetY').value = planet.y;
+                    document.getElementById('planetVelocityX').value = planet.velocityX;
+                    document.getElementById('planetVelocityY').value = planet.velocityY;
+                    document.getElementById('planetColor').value = planet.color;
+                    break;
+                }
+            }
+        }
+
+        function handleCanvasMouseUp() {
+            isDragging = false;
+            draggedPlanet = null;
+        }
+
+        function handleCanvasMouseMove(event) {
+            if (isDragging && draggedPlanet) {
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                draggedPlanet.x = x;
+                draggedPlanet.y = y;
+
+                // Update properties inputs
+                document.getElementById('planetX').value = x;
+                document.getElementById('planetY').value = y;
+            }
+        }
+
+        // Event Listeners
+        addPlanetButton.addEventListener('click', addPlanet);
+        resetButton.addEventListener('click', resetSimulation);
+        toggleTrailsButton.addEventListener('click', toggleTrails);
+        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('mouseup', handleCanvasMouseUp);
+        canvas.addEventListener('mousemove', handleCanvasMouseMove);
+
+        // Prevent simulation from running when adding a planet.
+        planetPropertiesDiv.style.display = 'none';
+        isPaused = true;
+
+        // Start the animation loop.
+        //animate(); // Start the animation when the page loads - removed the initial start to prevent simulation starting automatically.
+    </script>
+</body>
+</html>
